@@ -106,15 +106,23 @@
             Status: Inactive
         </div>
         
-        <div id="permissionCheck" style="margin: 10px 0; padding: 10px; background: #fff3cd; border-radius: 5px; display: none;">
-            <p><strong>Microphone permission check:</strong></p>
-            <div id="permissionStatus">Checking microphone permissions...</div>
-            <button id="checkPermBtn" style="background: #f0ad4e; margin-top: 10px;">Check Permissions</button>
+        <div style="margin: 10px 0; padding: 15px; background: #eaf7ff; border-radius: 5px;">
+            <p><strong>Testing Controls:</strong></p>
+            <div id="permissionCheck">
+                <p><strong>Microphone permission check:</strong></p>
+                <div id="permissionStatus">Checking microphone permissions...</div>
+                <button id="checkPermBtn" style="background: #f0ad4e; margin-top: 10px;">Check Permissions</button>
+            </div>
+            <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button id="audioTestBtn" style="background: #5cb85c; flex: 1;">Test Audio Context</button>
+                <button id="monitorBtn" style="background: #9c27b0; flex: 1; display: none;">Enable Direct Monitoring</button>
+            </div>
         </div>
         
-        <button id="startBtn">Start Noise Cancellation</button>
-        <button id="stopBtn" disabled>Stop</button>
-        <button id="audioTestBtn" style="background: #5cb85c;">Test Audio Context</button>
+        <div style="margin: 15px 0;">
+            <button id="startBtn">Start Noise Cancellation</button>
+            <button id="stopBtn" disabled>Stop</button>
+        </div>
         
         <div class="controls">
             <div class="parameter">
@@ -161,8 +169,16 @@
         </div>
         
         <div style="margin-top: 20px; font-size: 14px; color: #666;">
-            <p>Instructions: Place your phone in a stable position in your car, then press Start. Adjust sliders as needed to find the optimal noise cancellation.</p>
-            <p>⚠️ Tips for best results:</p>
+            <h3>How to use:</h3>
+            <ol style="color: #666; font-size: 14px;">
+                <li>Click "Check Permissions" to verify microphone access</li>
+                <li>Click "Test Audio Context" to test audio output</li>
+                <li>Click "Start Noise Cancellation" to begin</li>
+                <li>Use "Enable Direct Monitoring" to hear raw microphone input (helps verify input)</li>
+                <li>Adjust frequency and phase controls to target specific noise</li>
+            </ol>
+            
+            <h3>Tips for best results:</h3>
             <ul style="color: #666; font-size: 14px;">
                 <li>Start with low gain (30% or less) to avoid feedback</li>
                 <li>Position the phone away from speakers if possible</li>
@@ -200,6 +216,7 @@
             let outputAnalyzer = null;
             let bandpassFilter = null;
             let lowpassFilter = null;
+            let directGain = null;
             let isRunning = false;
             
             // DOM elements
@@ -438,31 +455,30 @@
                     lowpassFilter.type = "lowpass";
                     lowpassFilter.frequency.value = highFreqInput.value; // Limit higher frequencies
 
-                    // Force audio output to be audible by adding a direct microphone connection
-                    // This bypasses the phase cancellation for testing purposes
-                    // microphone -> gain node (direct) -> output
-                    const directGain = audioContext.createGain();
-                    directGain.gain.value = 0.5; // Start with a moderate gain
-                    microphone.connect(directGain);
-                    directGain.connect(audioContext.destination);
-                    
-                    console.log("Direct microphone monitoring enabled for testing");
-                    
-                    // Add a button to control direct monitoring
-                    const monitorBtn = document.createElement('button');
-                    monitorBtn.textContent = 'Toggle Direct Monitoring';
-                    monitorBtn.style.background = '#9c27b0';
-                    monitorBtn.style.marginTop = '10px';
-                    stopBtn.parentNode.insertBefore(monitorBtn, stopBtn.nextSibling);
-                    monitorBtn.addEventListener('click', () => {
-                        if (directGain.gain.value > 0) {
-                            directGain.gain.value = 0;
-                            monitorBtn.textContent = 'Enable Direct Monitoring';
-                        } else {
-                            directGain.gain.value = 0.5;
-                            monitorBtn.textContent = 'Disable Direct Monitoring';
+                    // Setup direct monitoring if not already created
+                    if (!directGain) {
+                        directGain = audioContext.createGain();
+                        directGain.gain.value = 0; // Start with monitoring off
+                        microphone.connect(directGain);
+                        directGain.connect(audioContext.destination);
+                        
+                        console.log("Direct microphone monitoring created");
+                        
+                        // Show and setup the monitoring button
+                        const monitorBtn = document.getElementById('monitorBtn');
+                        if (monitorBtn) {
+                            monitorBtn.style.display = 'block';
+                            monitorBtn.addEventListener('click', function() {
+                                if (directGain.gain.value > 0) {
+                                    directGain.gain.value = 0;
+                                    monitorBtn.textContent = 'Enable Direct Monitoring';
+                                } else {
+                                    directGain.gain.value = 0.5;
+                                    monitorBtn.textContent = 'Disable Direct Monitoring';
+                                }
+                            });
                         }
-                    });
+                    }
                     
                     // Connect the nodes with filtering:
                     // microphone -> bandpass -> lowpass -> delay -> inverter -> gain -> outputAnalyzer -> output
@@ -513,6 +529,10 @@
                     if (inverter) inverter.disconnect();
                     if (gainNode) gainNode.disconnect();
                     if (outputAnalyzer) outputAnalyzer.disconnect();
+                    if (directGain) directGain.disconnect();
+                    
+                    // Reset directGain to null so it can be recreated
+                    directGain = null;
                     
                     // Close audio context
                     audioContext.close();
@@ -524,6 +544,12 @@
                 stopBtn.disabled = true;
                 status.className = 'status inactive';
                 status.textContent = 'Status: Inactive';
+                
+                // Hide the monitor button
+                const monitorBtn = document.getElementById('monitorBtn');
+                if (monitorBtn) {
+                    monitorBtn.style.display = 'none';
+                }
                 
                 isRunning = false;
                 
