@@ -3,7 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Car Noise Cancellation Prototype</title>
+
+        <!---->
+        <meta property="url" content="https://vileduck.com/">
+        <meta property="og:url" content="https://vileduck.com/">
+        <title>Vileduck ANC Anywhere</title>
+        <meta property="title" content="Vileduck ANC Anywhere">
+        <meta property="og:title" content="Vileduck ANC Anywhere">
+        <meta name="twitter:title" content="Vileduck ANC Anywhere">
+        <meta name="description" content="Vileduck ANC for car - experimental prototype using Web Audio API.">
+        <meta property="og:description" content="Vileduck ANC for car - experimental prototype using Web Audio API.">
+        <meta name="twitter:description" content="Vileduck ANC for car - experimental prototype using Web Audio API.">
+        <meta name="keywords" content="Active noise cancellation, ANC, car noise cancellation, audio processing, web audio API, prototype, experimental">
+        <!---->
+        <meta name="author" content="Robert D Allen MBA">
+        <meta name="robots" content="index, follow">
+    
+        <!-- Favicon -->
+        <link rel="icon" href="favicon.png" type="image/png">
+    <title>Vileduck Car Noise Cancellation Prototype</title>
+
     <style>
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -99,14 +118,26 @@
             
             <div class="parameter">
                 <label for="gain">Output Gain</label>
-                <input type="range" id="gain" min="0" max="200" value="100" step="1">
-                <div class="value-display" id="gainValue">100%</div>
+                <input type="range" id="gain" min="0" max="100" value="30" step="1">
+                <div class="value-display" id="gainValue">30%</div>
             </div>
             
             <div class="parameter">
                 <label for="delay">Delay Compensation (ms)</label>
                 <input type="range" id="delay" min="0" max="100" value="0" step="1">
                 <div class="value-display" id="delayValue">0ms</div>
+            </div>
+            
+            <div class="parameter">
+                <label for="lowFreq">Low Cutoff (Hz)</label>
+                <input type="range" id="lowFreq" min="50" max="1000" value="200" step="10">
+                <div class="value-display" id="lowFreqValue">200 Hz</div>
+            </div>
+            
+            <div class="parameter">
+                <label for="highFreq">High Cutoff (Hz)</label>
+                <input type="range" id="highFreq" min="1000" max="8000" value="2000" step="100">
+                <div class="value-display" id="highFreqValue">2000 Hz</div>
             </div>
         </div>
         
@@ -124,9 +155,28 @@
         
         <div style="margin-top: 20px; font-size: 14px; color: #666;">
             <p>Instructions: Place your phone in a stable position in your car, then press Start. Adjust sliders as needed to find the optimal noise cancellation.</p>
+            <p>⚠️ Tips for best results:</p>
+            <ul style="color: #666; font-size: 14px;">
+                <li>Start with low gain (30% or less) to avoid feedback</li>
+                <li>Position the phone away from speakers if possible</li>
+                <li>Focus on specific frequency ranges rather than trying to cancel all noise</li>
+                <li>Try different delay settings to account for processing latency</li>
+                <li>Use headphones for initial testing to verify the system works</li>
+            </ul>
             <p>⚠️ Note: This is an experimental prototype and results may vary based on your device and environment.</p>
         </div>
     </div>
+
+    <footer class="container" style="margin:1em auto;text-align:center;">
+        <p>&copy;
+            <script>document.write(new Date().getFullYear())</script> ZingLab. All rights reserved.
+        </p>
+        <!-- Contact Section -->
+        <section id="contact" class="contact">
+            <p><span>Hi</span>@<span>ZingLab.com</span></p>
+        </section>
+    </footer>
+
 
     <script>
         // Web Audio API variables
@@ -159,13 +209,26 @@
         gainInput.addEventListener('input', updateGain);
         delayInput.addEventListener('input', updateDelay);
         
+        // Add new filter control listeners
+        const lowFreqInput = document.getElementById('lowFreq');
+        const lowFreqValue = document.getElementById('lowFreqValue');
+        const highFreqInput = document.getElementById('highFreq');
+        const highFreqValue = document.getElementById('highFreqValue');
+        
+        lowFreqInput.addEventListener('input', updateLowFreq);
+        highFreqInput.addEventListener('input', updateHighFreq);
+        
         // Update value displays
         function updatePhaseShift() {
             const value = phaseShiftInput.value;
             phaseShiftValue.textContent = `${value}°`;
-            if (isRunning) {
-                // In a real implementation, we'd adjust the phase shift here
-                // This is a simple prototype, so we're just updating the display
+            if (isRunning && inverter) {
+                // We can approximate phase shift by adjusting the gain value
+                // Phase inversion (180°) is gain of -1.0
+                // 0° would be gain of 1.0
+                // This is simplified but can allow some adjustment
+                const normalizedPhase = (value - 180) / 180; // -1 to 1 centered around 180°
+                inverter.gain.value = -1.0 + normalizedPhase * 0.5; // Subtle adjustment around -1.0
             }
         }
         
@@ -185,6 +248,22 @@
             }
         }
         
+        function updateLowFreq() {
+            const value = lowFreqInput.value;
+            lowFreqValue.textContent = `${value} Hz`;
+            if (isRunning && bandpassFilter) {
+                bandpassFilter.frequency.value = value;
+            }
+        }
+        
+        function updateHighFreq() {
+            const value = highFreqInput.value;
+            highFreqValue.textContent = `${value} Hz`;
+            if (isRunning && lowpassFilter) {
+                lowpassFilter.frequency.value = value;
+            }
+        }
+        
         // Main functions
         async function startNoiseCancellation() {
             try {
@@ -192,7 +271,13 @@
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 
                 // Get microphone access
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { 
+                        echoCancellation: true,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    } 
+                });
                 microphone = audioContext.createMediaStreamSource(stream);
                 
                 // Create analyzer for input monitoring
@@ -200,11 +285,22 @@
                 analyzer.fftSize = 2048;
                 microphone.connect(analyzer);
                 
+                // Create bandpass filter to focus on target frequencies
+                bandpassFilter = audioContext.createBiquadFilter();
+                bandpassFilter.type = "bandpass";
+                bandpassFilter.frequency.value = lowFreqInput.value;
+                bandpassFilter.Q.value = 0.7;
+                
+                // Create lowpass filter to reduce high frequency feedback
+                lowpassFilter = audioContext.createBiquadFilter();
+                lowpassFilter.type = "lowpass";
+                lowpassFilter.frequency.value = highFreqInput.value;
+                
                 // Create delay node (for fine-tuning timing)
                 delayNode = audioContext.createDelay(1);
                 delayNode.delayTime.value = delayInput.value / 1000;
                 
-                // Create gain node for controlling output volume
+                // Create gain node for controlling output volume (start with lower gain)
                 gainNode = audioContext.createGain();
                 gainNode.gain.value = gainInput.value / 100;
                 
@@ -216,9 +312,22 @@
                 outputAnalyzer = audioContext.createAnalyser();
                 outputAnalyzer.fftSize = 2048;
                 
-                // Connect the nodes:
-                // microphone -> delay -> inverter -> gain -> outputAnalyzer -> output
-                microphone.connect(delayNode);
+                // Create a bandpass filter to limit feedback
+                const bandpassFilter = audioContext.createBiquadFilter();
+                bandpassFilter.type = "bandpass";
+                bandpassFilter.frequency.value = 500; // Focus on mid-range frequencies
+                bandpassFilter.Q.value = 0.7; // Moderate Q factor
+
+                // Create a low-pass filter to further reduce feedback
+                const lowpassFilter = audioContext.createBiquadFilter();
+                lowpassFilter.type = "lowpass";
+                lowpassFilter.frequency.value = 2000; // Limit higher frequencies
+
+                // Connect the nodes with filtering:
+                // microphone -> bandpass -> lowpass -> delay -> inverter -> gain -> outputAnalyzer -> output
+                microphone.connect(bandpassFilter);
+                bandpassFilter.connect(lowpassFilter);
+                lowpassFilter.connect(delayNode);
                 delayNode.connect(inverter);
                 inverter.connect(gainNode);
                 gainNode.connect(outputAnalyzer);
