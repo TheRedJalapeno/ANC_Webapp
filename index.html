@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Noise Cancellation Prototype</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            color: #333;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 0;
+            width: 100%;
+        }
+        button:disabled {
+            background: #ccc;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .active {
+            background: #d6f5d6;
+        }
+        .inactive {
+            background: #f5d6d6;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        .meter {
+            height: 20px;
+            background: #eee;
+            border-radius: 3px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .meter-fill {
+            height: 100%;
+            width: 0%;
+            background: #4285f4;
+            transition: width 0.1s ease;
+        }
+        .parameter {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
+        .value-display {
+            font-size: 14px;
+            color: #666;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Car Noise Cancellation</h1>
+        
+        <div class="status inactive" id="status">
+            Status: Inactive
+        </div>
+        
+        <button id="startBtn">Start Noise Cancellation</button>
+        <button id="stopBtn" disabled>Stop</button>
+        
+        <div class="controls">
+            <div class="parameter">
+                <label for="phaseShift">Phase Shift Adjustment</label>
+                <input type="range" id="phaseShift" min="0" max="360" value="180" step="1">
+                <div class="value-display" id="phaseShiftValue">180°</div>
+            </div>
+            
+            <div class="parameter">
+                <label for="gain">Output Gain</label>
+                <input type="range" id="gain" min="0" max="200" value="100" step="1">
+                <div class="value-display" id="gainValue">100%</div>
+            </div>
+            
+            <div class="parameter">
+                <label for="delay">Delay Compensation (ms)</label>
+                <input type="range" id="delay" min="0" max="100" value="0" step="1">
+                <div class="value-display" id="delayValue">0ms</div>
+            </div>
+        </div>
+        
+        <div>
+            <h3>Input Level</h3>
+            <div class="meter">
+                <div class="meter-fill" id="inputMeter"></div>
+            </div>
+            
+            <h3>Output Level</h3>
+            <div class="meter">
+                <div class="meter-fill" id="outputMeter"></div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px; font-size: 14px; color: #666;">
+            <p>Instructions: Place your phone in a stable position in your car, then press Start. Adjust sliders as needed to find the optimal noise cancellation.</p>
+            <p>⚠️ Note: This is an experimental prototype and results may vary based on your device and environment.</p>
+        </div>
+    </div>
+
+    <script>
+        // Web Audio API variables
+        let audioContext;
+        let analyzer;
+        let microphone;
+        let gainNode;
+        let delayNode;
+        let inverter;
+        let outputAnalyzer;
+        let isRunning = false;
+        
+        // DOM elements
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const status = document.getElementById('status');
+        const phaseShiftInput = document.getElementById('phaseShift');
+        const phaseShiftValue = document.getElementById('phaseShiftValue');
+        const gainInput = document.getElementById('gain');
+        const gainValue = document.getElementById('gainValue');
+        const delayInput = document.getElementById('delay');
+        const delayValue = document.getElementById('delayValue');
+        const inputMeter = document.getElementById('inputMeter');
+        const outputMeter = document.getElementById('outputMeter');
+        
+        // Event listeners
+        startBtn.addEventListener('click', startNoiseCancellation);
+        stopBtn.addEventListener('click', stopNoiseCancellation);
+        phaseShiftInput.addEventListener('input', updatePhaseShift);
+        gainInput.addEventListener('input', updateGain);
+        delayInput.addEventListener('input', updateDelay);
+        
+        // Update value displays
+        function updatePhaseShift() {
+            const value = phaseShiftInput.value;
+            phaseShiftValue.textContent = `${value}°`;
+            if (isRunning) {
+                // In a real implementation, we'd adjust the phase shift here
+                // This is a simple prototype, so we're just updating the display
+            }
+        }
+        
+        function updateGain() {
+            const value = gainInput.value;
+            gainValue.textContent = `${value}%`;
+            if (gainNode) {
+                gainNode.gain.value = value / 100;
+            }
+        }
+        
+        function updateDelay() {
+            const value = delayInput.value;
+            delayValue.textContent = `${value}ms`;
+            if (delayNode) {
+                delayNode.delayTime.value = value / 1000; // Convert ms to seconds
+            }
+        }
+        
+        // Main functions
+        async function startNoiseCancellation() {
+            try {
+                // Create audio context
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Get microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                microphone = audioContext.createMediaStreamSource(stream);
+                
+                // Create analyzer for input monitoring
+                analyzer = audioContext.createAnalyser();
+                analyzer.fftSize = 2048;
+                microphone.connect(analyzer);
+                
+                // Create delay node (for fine-tuning timing)
+                delayNode = audioContext.createDelay(1);
+                delayNode.delayTime.value = delayInput.value / 1000;
+                
+                // Create gain node for controlling output volume
+                gainNode = audioContext.createGain();
+                gainNode.gain.value = gainInput.value / 100;
+                
+                // Create phase inverter (a gain node with negative gain inverts the phase)
+                inverter = audioContext.createGain();
+                inverter.gain.value = -1.0; // Invert the signal (180° phase shift)
+                
+                // Create output analyzer
+                outputAnalyzer = audioContext.createAnalyser();
+                outputAnalyzer.fftSize = 2048;
+                
+                // Connect the nodes:
+                // microphone -> delay -> inverter -> gain -> outputAnalyzer -> output
+                microphone.connect(delayNode);
+                delayNode.connect(inverter);
+                inverter.connect(gainNode);
+                gainNode.connect(outputAnalyzer);
+                gainNode.connect(audioContext.destination);
+                
+                // Update UI
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                status.className = 'status active';
+                status.textContent = 'Status: Active - Noise Cancellation Running';
+                
+                // Start visualization
+                isRunning = true;
+                updateMeters();
+                
+            } catch (error) {
+                console.error("Error accessing microphone:", error);
+                alert("Could not access microphone. Please ensure you've granted permission.");
+            }
+        }
+        
+        function stopNoiseCancellation() {
+            if (audioContext) {
+                // Disconnect everything
+                if (microphone) microphone.disconnect();
+                if (delayNode) delayNode.disconnect();
+                if (inverter) inverter.disconnect();
+                if (gainNode) gainNode.disconnect();
+                if (outputAnalyzer) outputAnalyzer.disconnect();
+                
+                // Close audio context
+                audioContext.close();
+                audioContext = null;
+            }
+            
+            // Update UI
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+            status.className = 'status inactive';
+            status.textContent = 'Status: Inactive';
+            
+            isRunning = false;
+            
+            // Reset meters
+            inputMeter.style.width = '0%';
+            outputMeter.style.width = '0%';
+        }
+        
+        function updateMeters() {
+            if (!isRunning) return;
+            
+            // Update input meter
+            if (analyzer) {
+                const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+                analyzer.getByteTimeDomainData(dataArray);
+                
+                // Calculate RMS (root mean square) for a better volume representation
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    const normalized = (dataArray[i] / 128) - 1;
+                    sum += normalized * normalized;
+                }
+                const rms = Math.sqrt(sum / dataArray.length);
+                const inputLevel = Math.min(100, rms * 400); // Scale to percentage
+                inputMeter.style.width = inputLevel + '%';
+            }
+            
+            // Update output meter
+            if (outputAnalyzer) {
+                const dataArray = new Uint8Array(outputAnalyzer.frequencyBinCount);
+                outputAnalyzer.getByteTimeDomainData(dataArray);
+                
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    const normalized = (dataArray[i] / 128) - 1;
+                    sum += normalized * normalized;
+                }
+                const rms = Math.sqrt(sum / dataArray.length);
+                const outputLevel = Math.min(100, rms * 400);
+                outputMeter.style.width = outputLevel + '%';
+            }
+            
+            requestAnimationFrame(updateMeters);
+        }
+    </script>
+</body>
+</html>
