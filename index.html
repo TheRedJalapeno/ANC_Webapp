@@ -1,26 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        <!---->
-        <meta property="url" content="https://vileduck.com/">
-        <meta property="og:url" content="https://vileduck.com/">
-        <title>Vileduck ANC Anywhere</title>
-        <meta property="title" content="Vileduck ANC Anywhere">
-        <meta property="og:title" content="Vileduck ANC Anywhere">
-        <meta name="twitter:title" content="Vileduck ANC Anywhere">
-        <meta name="description" content="Vileduck ANC for car - experimental prototype using Web Audio API.">
-        <meta property="og:description" content="Vileduck ANC for car - experimental prototype using Web Audio API.">
-        <meta name="twitter:description" content="Vileduck ANC for car - experimental prototype using Web Audio API.">
-        <meta name="keywords" content="Active noise cancellation, ANC, car noise cancellation, audio processing, web audio API, prototype, experimental">
-        <!---->
-        <meta name="author" content="Robert D Allen MBA">
-        <meta name="robots" content="index, follow">
-    
-        <!-- Favicon -->
-        <link rel="icon" href="favicon.png" type="image/png">
+    <!---->
+    <meta property="url" content="https://vileduck.com/">
+    <meta property="og:url" content="https://vileduck.com/">
+    <title>Vileduck ANC Anywhere</title>
+    <meta property="title" content="Vileduck ANC Anywhere">
+    <meta property="og:title" content="Vileduck ANC Anywhere">
+    <meta name="twitter:title" content="Vileduck ANC Anywhere">
+    <meta name="description" content="Vileduck ANC for car - experimental prototype using Web Audio API.">
+    <meta property="og:description" content="Vileduck ANC for car - experimental prototype using Web Audio API.">
+    <meta name="twitter:description" content="Vileduck ANC for car - experimental prototype using Web Audio API.">
+    <meta name="keywords"
+        content="Active noise cancellation, ANC, car noise cancellation, audio processing, web audio API, prototype, experimental">
+    <!---->
+    <meta name="author" content="Robert D Allen MBA">
+    <meta name="robots" content="index, follow">
+
+    <!-- Favicon -->
+    <link rel="icon" href="favicon.png" type="image/png">
     <title>Vileduck Car Noise Cancellation Prototype</title>
 
     <style>
@@ -31,14 +33,16 @@
             background: #f0f0f0;
             color: #333;
         }
+
         .container {
             max-width: 500px;
             margin: 0 auto;
             background: white;
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
+
         button {
             background: #4285f4;
             color: white;
@@ -50,23 +54,29 @@
             margin: 10px 0;
             width: 100%;
         }
+
         button:disabled {
             background: #ccc;
         }
+
         .status {
             padding: 10px;
             margin: 10px 0;
             border-radius: 5px;
         }
+
         .active {
             background: #d6f5d6;
         }
+
         .inactive {
             background: #f5d6d6;
         }
+
         .controls {
             margin: 20px 0;
         }
+
         .meter {
             height: 20px;
             background: #eee;
@@ -74,23 +84,28 @@
             margin: 10px 0;
             overflow: hidden;
         }
+
         .meter-fill {
             height: 100%;
             width: 0%;
             background: #4285f4;
             transition: width 0.1s ease;
         }
+
         .parameter {
             margin: 15px 0;
         }
+
         label {
             display: block;
             margin-bottom: 5px;
             font-weight: bold;
         }
+
         input[type="range"] {
             width: 100%;
         }
+
         .value-display {
             font-size: 14px;
             color: #666;
@@ -98,14 +113,15 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>Noise Cancellation Prototype</h1>
-        
+
         <div class="status inactive" id="status">
             Status: Inactive
         </div>
-        
+
         <div style="margin: 10px 0; padding: 15px; background: #eaf7ff; border-radius: 5px;">
             <p><strong>Testing Controls:</strong></p>
             <div id="permissionCheck">
@@ -115,59 +131,60 @@
             </div>
             <div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
                 <button id="audioTestBtn" style="background: #5cb85c; flex: 1;">Test Audio Context</button>
-                <button id="monitorBtn" style="background: #9c27b0; flex: 1; display: none;">Enable Direct Monitoring</button>
+                <button id="monitorBtn" style="background: #9c27b0; flex: 1; display: none;">Enable Direct
+                    Monitoring</button>
             </div>
         </div>
-        
+
         <div style="margin: 15px 0;">
             <button id="startBtn">Start Noise Cancellation</button>
             <button id="stopBtn" disabled>Stop</button>
         </div>
-        
+
         <div class="controls">
             <div class="parameter">
                 <label for="phaseShift">Phase Shift Adjustment</label>
                 <input type="range" id="phaseShift" min="0" max="360" value="180" step="1">
                 <div class="value-display" id="phaseShiftValue">180°</div>
             </div>
-            
+
             <div class="parameter">
                 <label for="gain">Output Gain</label>
                 <input type="range" id="gain" min="0" max="100" value="75" step="1">
                 <div class="value-display" id="gainValue">75%</div>
             </div>
-            
+
             <div class="parameter">
                 <label for="delay">Delay Compensation (ms)</label>
                 <input type="range" id="delay" min="0" max="100" value="0" step="1">
                 <div class="value-display" id="delayValue">0ms</div>
             </div>
-            
+
             <div class="parameter">
                 <label for="lowFreq">Low Cutoff (Hz)</label>
                 <input type="range" id="lowFreq" min="50" max="1000" value="200" step="10">
                 <div class="value-display" id="lowFreqValue">200 Hz</div>
             </div>
-            
+
             <div class="parameter">
                 <label for="highFreq">High Cutoff (Hz)</label>
                 <input type="range" id="highFreq" min="1000" max="8000" value="2000" step="100">
                 <div class="value-display" id="highFreqValue">2000 Hz</div>
             </div>
         </div>
-        
+
         <div>
             <h3>Input Level</h3>
             <div class="meter">
                 <div class="meter-fill" id="inputMeter"></div>
             </div>
-            
+
             <h3>Output Level</h3>
             <div class="meter">
                 <div class="meter-fill" id="outputMeter"></div>
             </div>
         </div>
-        
+
         <div style="margin-top: 20px; font-size: 14px; color: #666;">
             <h3>How to use:</h3>
             <ol style="color: #666; font-size: 14px;">
@@ -177,7 +194,7 @@
                 <li>Use "Enable Direct Monitoring" to hear raw microphone input (helps verify input)</li>
                 <li>Adjust frequency and phase controls to target specific noise</li>
             </ol>
-            
+
             <h3>Tips for best results:</h3>
             <ul style="color: #666; font-size: 14px;">
                 <li>Start with low gain (30% or less) to avoid feedback</li>
@@ -194,7 +211,9 @@
     <!-- ----- ----- ----- -->
     <!-- Footer Section -->
     <footer class="container" style="margin:1em auto;text-align:center;">
-        <p>&copy;<script>document.write(new Date().getFullYear())</script> ZingLab. All rights reserved.</p>
+        <p>&copy;
+            <script>document.write(new Date().getFullYear())</script> ZingLab. All rights reserved.
+        </p>
         <section id="contact" class="contact">
             <p><span>Hi</span>@<span>ZingLab.com</span></p>
         </section>
@@ -202,8 +221,8 @@
     <!-- END of Footer Section -->
     <!-- ----- ----- ----- -->
     <!-- ----- ----- ----- -->
-    
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dsp.js/1.0.1/dsp.min.js"></script>
     <script>
         // Add these variables to your existing declarations
 let scriptProcessor = null;
@@ -214,8 +233,6 @@ let bufferSize = 4096; // Must be power of 2
 // Replace the existing startNoiseCancellation function with this enhanced version
 async function startNoiseCancellation() {
     try {
-        // [Keep existing initialization code...]
-        
         // Create audio context
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         
@@ -242,6 +259,7 @@ async function startNoiseCancellation() {
         microphone.connect(analyzer);
         
         // Create a script processor node for custom FFT-based processing
+        // Note: ScriptProcessorNode is deprecated, consider using AudioWorklet in production
         scriptProcessor = audioContext.createScriptProcessor(bufferSize, 1, 1);
         
         // Create gain node for output volume
@@ -272,17 +290,33 @@ async function startNoiseCancellation() {
         gainNode.connect(outputAnalyzer);
         gainNode.connect(audioContext.destination);
         
-        // Direct monitoring setup (Keep existing code...)
+        // Set up direct monitoring
         if (!directGain) {
             directGain = audioContext.createGain();
             directGain.gain.value = 0; // Start with monitoring off
             microphone.connect(directGain);
             directGain.connect(audioContext.destination);
             
-            // Show and setup monitoring button...
+            // Show and setup the monitoring button
+            const monitorBtn = document.getElementById('monitorBtn');
+            if (monitorBtn) {
+                monitorBtn.style.display = 'block';
+                monitorBtn.addEventListener('click', function() {
+                    if (directGain.gain.value > 0) {
+                        directGain.gain.value = 0;
+                        monitorBtn.textContent = 'Enable Direct Monitoring';
+                    } else {
+                        directGain.gain.value = 0.5;
+                        monitorBtn.textContent = 'Disable Direct Monitoring';
+                    }
+                });
+            }
         }
         
-        // Update UI (Keep existing code...)
+        // Set up the calibration button
+        setupCalibrationButton();
+        
+        // Update UI
         startBtn.disabled = true;
         stopBtn.disabled = false;
         status.className = 'status active';
@@ -293,74 +327,209 @@ async function startNoiseCancellation() {
         updateMeters();
         
     } catch (error) {
-        // Error handling (Keep existing code...)
+        // More detailed error message
+        const errorMessage = `Microphone access error: ${error.name}: ${error.message}
+        
+- Make sure microphone permissions are enabled in browser settings
+- Try using a different browser (Chrome often works best)
+- If using HTTPS, make sure your connection is secure
+- Refresh the page and try again
+        
+Technical details: ${error.toString()}`;
+        
+        console.error("Microphone access error:", error);
+        status.className = 'status inactive';
+        status.innerHTML = `Error: ${error.name}<br><small>${error.message}</small>`;
+        
+        alert(errorMessage);
     }
 }
 
-// Add this new function for FFT-based processing
+
+
+// Add these variables to your global declarations
+let fft = null;
+let ifft = null;
+let calibrationMode = false;
+let noiseProfile = null;
+let noiseProfileFFT = null;
+let calibrationButton = null;
+
+// Function to set up the calibration button
+function setupCalibrationButton() {
+    calibrationButton = document.getElementById('calibrateBtn');
+    if (!calibrationButton) {
+        calibrationButton = document.createElement('button');
+        calibrationButton.id = 'calibrateBtn';
+        calibrationButton.textContent = 'Calibrate Noise Profile';
+        calibrationButton.className = 'control-button';
+        document.querySelector('.controls').appendChild(calibrationButton);
+    }
+    
+    calibrationButton.addEventListener('click', toggleCalibrationMode);
+}
+
+// Function to toggle calibration mode
+function toggleCalibrationMode() {
+    calibrationMode = !calibrationMode;
+    
+    if (calibrationMode) {
+        calibrationButton.textContent = 'Stop Calibration';
+        status.textContent = 'Status: Calibrating Noise Profile...';
+        // Reset noise profile
+        noiseProfile = new Float32Array(bufferSize);
+        noiseProfileFFT = null;
+    } else {
+        calibrationButton.textContent = 'Calibrate Noise Profile';
+        status.textContent = 'Status: Active - Noise Cancellation Running';
+        // Compute FFT of collected noise profile
+        if (noiseProfile) {
+            computeNoiseProfileFFT();
+        }
+    }
+}
+
+// Function to compute FFT of noise profile
+function computeNoiseProfileFFT() {
+    if (!noiseProfile) return;
+    
+    // Clone the noise profile to avoid modifying it
+    const buffer = new Float32Array(noiseProfile);
+    
+    // Use DSP.js to compute FFT
+    const fftSize = buffer.length;
+    const fft = new FFT(fftSize, audioContext.sampleRate);
+    fft.forward(buffer);
+    
+    // Store magnitude and phase information
+    noiseProfileFFT = {
+        real: new Float32Array(fft.real),
+        imag: new Float32Array(fft.imag),
+        magnitude: new Float32Array(fftSize/2),
+        phase: new Float32Array(fftSize/2)
+    };
+    
+    // Compute magnitude and phase
+    for (let i = 0; i < fftSize/2; i++) {
+        const real = fft.real[i];
+        const imag = fft.imag[i];
+        
+        // Magnitude: sqrt(real² + imag²)
+        noiseProfileFFT.magnitude[i] = Math.sqrt(real*real + imag*imag);
+        
+        // Phase: atan2(imag, real)
+        noiseProfileFFT.phase[i] = Math.atan2(imag, real);
+    }
+    
+    console.log('Noise profile FFT computed:', noiseProfileFFT);
+}
+
+// Enhanced FFT-based processing function
 function processAudioWithFFT(inputData, outputData) {
-    // If this is our first buffer, initialize the reference buffer
-    if (referenceBuffer.length === 0 && inputData.length > 0) {
-        // Use initial noise sample as reference
-        for (let i = 0; i < inputData.length; i++) {
-            referenceBuffer.push(inputData[i]);
-        }
-        console.log("Reference noise sample captured");
+    // Create FFT objects if they don't exist
+    if (!fft) {
+        fft = new FFT(bufferSize, audioContext.sampleRate);
+    }
+    if (!ifft) {
+        ifft = new FFT(bufferSize, audioContext.sampleRate);
     }
     
-    // Get current frequencies from analyzer
-    const frequencyData = new Uint8Array(analyzer.frequencyBinCount);
-    analyzer.getByteFrequencyData(frequencyData);
+    // Clone input data to avoid modifying the original
+    const buffer = new Float32Array(inputData);
     
-    // Convert slider values to usable ranges
-    const phaseAdjustment = (phaseShiftInput.value - 180) / 180 * Math.PI; // Convert to radians
+    // If in calibration mode, collect noise profile
+    if (calibrationMode) {
+        // Average the input data into the noise profile
+        if (!noiseProfile) {
+            noiseProfile = new Float32Array(buffer.length);
+        }
+        
+        for (let i = 0; i < buffer.length; i++) {
+            noiseProfile[i] = (noiseProfile[i] * 0.9) + (buffer[i] * 0.1);
+        }
+        
+        // Just pass through the audio while calibrating
+        for (let i = 0; i < outputData.length; i++) {
+            outputData[i] = buffer[i];
+        }
+        
+        return;
+    }
+    
+    // Perform forward FFT on input buffer
+    fft.forward(buffer);
+    
+    // Get frequency domain representation
+    const real = fft.real;
+    const imag = fft.imag;
+    
+    // Get current slider values
+    const phaseShift = (phaseShiftInput.value - 180) / 180 * Math.PI; // Convert to radians
     const gainLevel = gainInput.value / 100;
-    const delayAmount = delayInput.value / 1000; // Convert ms to seconds
+    const lowFreq = parseInt(lowFreqInput.value);
+    const highFreq = parseInt(highFreqInput.value);
     
-    // Apply noise cancellation based on frequency analysis
+    // Compute frequency resolution (Hz per bin)
+    const freqResolution = audioContext.sampleRate / bufferSize;
+    
+    // Process each frequency bin
+    for (let i = 0; i < bufferSize/2; i++) {
+        // Calculate frequency of this bin
+        const frequency = i * freqResolution;
+        
+        // Apply frequency-selective processing based on slider settings
+        if (frequency >= lowFreq && frequency <= highFreq) {
+            // Apply noise cancellation if we have a noise profile
+            if (noiseProfileFFT) {
+                // Get the magnitude and phase of the noise at this frequency
+                const noiseMag = noiseProfileFFT.magnitude[i];
+                const noisePhase = noiseProfileFFT.phase[i];
+                
+                // Calculate current signal magnitude and phase
+                const signalMag = Math.sqrt(real[i]*real[i] + imag[i]*imag[i]);
+                const signalPhase = Math.atan2(imag[i], real[i]);
+                
+                // Calculate phase difference and adjust according to user input
+                let phaseDiff = signalPhase - noisePhase + Math.PI + phaseShift;
+                
+                // Normalize phase difference to [-π, π]
+                while (phaseDiff > Math.PI) phaseDiff -= 2 * Math.PI;
+                while (phaseDiff < -Math.PI) phaseDiff += 2 * Math.PI;
+                
+                // Apply cancellation with adjusted gain
+                // This creates a "counter-wave" with inverted phase
+                const cancelMag = noiseMag * gainLevel;
+                
+                // Convert back to real/imag components
+                const cancelReal = cancelMag * Math.cos(noisePhase + Math.PI + phaseShift);
+                const cancelImag = cancelMag * Math.sin(noisePhase + Math.PI + phaseShift);
+                
+                // Add cancellation signal to the original
+                real[i] += cancelReal;
+                imag[i] += cancelImag;
+            } else {
+                // Simple phase inversion if no noise profile
+                real[i] = -real[i] * gainLevel;
+                imag[i] = -imag[i] * gainLevel;
+            }
+        } else {
+            // For frequencies outside our range of interest, reduce the effect
+            real[i] *= 0.5;
+            imag[i] *= 0.5;
+        }
+    }
+    
+    // Perform inverse FFT to get back to time domain
+    ifft.inverse(real, imag);
+    
+    // Copy the processed data to the output buffer
     for (let i = 0; i < outputData.length; i++) {
-        // Phase inversion with adjustable phase and gain
-        let sample = -inputData[i] * gainLevel;
-        
-        // Apply any additional phase adjustment using a simple approximation
-        // (In a full FFT implementation, you would modify phase in frequency domain)
-        if (phaseAdjustment !== 0) {
-            const sampleShifted = i + Math.floor(delayAmount * audioContext.sampleRate);
-            if (sampleShifted < inputData.length) {
-                sample = -inputData[sampleShifted] * gainLevel;
-            }
-        }
-        
-        // Apply noise cancellation but with band-limiting based on slider settings
-        const lowFreq = parseInt(lowFreqInput.value);
-        const highFreq = parseInt(highFreqInput.value);
-        
-        // Simple bandpass filtering (in a full implementation, this would use FFT)
-        // This is a basic approximation until we integrate a real FFT library
-        if (i % analyzer.frequencyBinCount === 0) {
-            // Determine if we're within the frequency range of interest
-            let inRange = false;
-            const binSize = audioContext.sampleRate / analyzer.frequencyBinCount;
-            
-            for (let j = 0; j < frequencyData.length; j++) {
-                const frequency = j * binSize;
-                if (frequency >= lowFreq && frequency <= highFreq && frequencyData[j] > 128) {
-                    inRange = true;
-                    break;
-                }
-            }
-            
-            // If not in our target frequency range, reduce the cancellation effect
-            if (!inRange) {
-                sample *= 0.5;
-            }
-        }
-        
-        outputData[i] = sample;
+        outputData[i] = ifft.real[i];
     }
 }
 
-// Update the stopNoiseCancellation function to handle the scriptProcessor
+
+// Complete stopNoiseCancellation function
 function stopNoiseCancellation() {
     if (audioContext) {
         // Disconnect everything
@@ -381,8 +550,25 @@ function stopNoiseCancellation() {
         audioContext = null;
     }
     
-    // [Keep the rest of the existing stopNoiseCancellation code...]
+    // Update UI
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    status.className = 'status inactive';
+    status.textContent = 'Status: Inactive';
+    
+    // Hide the monitor button
+    const monitorBtn = document.getElementById('monitorBtn');
+    if (monitorBtn) {
+        monitorBtn.style.display = 'none';
+    }
+    
+    isRunning = false;
+    
+    // Reset meters
+    inputMeter.style.width = '0%';
+    outputMeter.style.width = '0%';
 }
     </script>
 </body>
+
 </html>
