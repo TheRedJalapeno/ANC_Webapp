@@ -106,8 +106,15 @@
             Status: Inactive
         </div>
         
+        <div id="permissionCheck" style="margin: 10px 0; padding: 10px; background: #fff3cd; border-radius: 5px; display: none;">
+            <p><strong>Microphone permission check:</strong></p>
+            <div id="permissionStatus">Checking microphone permissions...</div>
+            <button id="checkPermBtn" style="background: #f0ad4e; margin-top: 10px;">Check Permissions</button>
+        </div>
+        
         <button id="startBtn">Start Noise Cancellation</button>
         <button id="stopBtn" disabled>Stop</button>
+        <button id="audioTestBtn" style="background: #5cb85c;">Test Audio Context</button>
         
         <div class="controls">
             <div class="parameter">
@@ -187,11 +194,17 @@
         let delayNode;
         let inverter;
         let outputAnalyzer;
+        let bandpassFilter;
+        let lowpassFilter;
         let isRunning = false;
         
         // DOM elements
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
+        const audioTestBtn = document.getElementById('audioTestBtn');
+        const checkPermBtn = document.getElementById('checkPermBtn');
+        const permissionCheck = document.getElementById('permissionCheck');
+        const permissionStatus = document.getElementById('permissionStatus');
         const status = document.getElementById('status');
         const phaseShiftInput = document.getElementById('phaseShift');
         const phaseShiftValue = document.getElementById('phaseShiftValue');
@@ -202,9 +215,88 @@
         const inputMeter = document.getElementById('inputMeter');
         const outputMeter = document.getElementById('outputMeter');
         
+        // Check and display browser compatibility info
+        permissionCheck.style.display = 'block';
+        
         // Event listeners
         startBtn.addEventListener('click', startNoiseCancellation);
         stopBtn.addEventListener('click', stopNoiseCancellation);
+        audioTestBtn.addEventListener('click', testAudioContext);
+        checkPermBtn.addEventListener('click', checkMicrophonePermission);
+        
+        // Check for browser compatibility
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            permissionStatus.innerHTML = '<span style="color: red;">❌ ERROR: MediaDevices API not supported in this browser. Try Chrome or Edge.</span>';
+        } else {
+            checkMicrophonePermission();
+        }
+        
+        // Function to test audio context creation
+        async function testAudioContext() {
+            try {
+                const testContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Create a simple oscillator to test audio output
+                const oscillator = testContext.createOscillator();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(440, testContext.currentTime); // A4 note
+                
+                const gainNode = testContext.createGain();
+                gainNode.gain.setValueAtTime(0.2, testContext.currentTime); // Low volume
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(testContext.destination);
+                
+                oscillator.start();
+                setTimeout(() => {
+                    oscillator.stop();
+                    testContext.close();
+                    alert("Audio test completed successfully. If you heard a beep, audio context is working properly.");
+                }, 1000);
+                
+                status.innerHTML = `Audio Context State: ${testContext.state}`;
+            } catch (error) {
+                console.error("Audio context test failed:", error);
+                alert(`Audio context test failed: ${error.message}`);
+            }
+        }
+        
+        // Function to check microphone permission
+        async function checkMicrophonePermission() {
+            permissionStatus.innerHTML = 'Checking microphone permissions...';
+            
+            try {
+                // Query device permissions
+                const permissionStatus = await navigator.permissions.query({name: 'microphone'});
+                
+                if (permissionStatus.state === 'granted') {
+                    document.getElementById('permissionStatus').innerHTML = 
+                        '<span style="color: green;">✅ Microphone permission granted</span>';
+                } else if (permissionStatus.state === 'prompt') {
+                    document.getElementById('permissionStatus').innerHTML = 
+                        '<span style="color: orange;">⚠️ Microphone permission will be requested when you start</span>';
+                } else if (permissionStatus.state === 'denied') {
+                    document.getElementById('permissionStatus').innerHTML = 
+                        '<span style="color: red;">❌ Microphone permission denied. Please reset permissions in your browser settings.</span>';
+                }
+                
+                // Try to actually get the media stream as a further test
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+                    document.getElementById('permissionStatus').innerHTML += 
+                        '<br><span style="color: green;">✅ Successfully accessed microphone</span>';
+                    
+                    // Clean up the test stream
+                    stream.getTracks().forEach(track => track.stop());
+                } catch (streamError) {
+                    document.getElementById('permissionStatus').innerHTML += 
+                        `<br><span style="color: red;">❌ Could not access microphone: ${streamError.message}</span>`;
+                }
+            } catch (error) {
+                document.getElementById('permissionStatus').innerHTML = 
+                    `<span style="color: red;">❌ Error checking permissions: ${error.message}</span>`;
+            }
+        }
         phaseShiftInput.addEventListener('input', updatePhaseShift);
         gainInput.addEventListener('input', updateGain);
         delayInput.addEventListener('input', updateDelay);
@@ -267,18 +359,46 @@
         // Main functions
         async function startNoiseCancellation() {
             try {
-                // Create audio context
+                // Log browser information for debugging
+                console.log("Browser:", navigator.userAgent);
+                
+                // Make sure we have access to required APIs
+                if (!window.AudioContext && !window.webkitAudioContext) {
+                    throw new Error("AudioContext not supported in this browser");
+                }
+                
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("MediaDevices API not supported in this browser");
+                }
+                
+                // Create audio context - with user interaction to avoid autoplay policy issues
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 
-                // Get microphone access
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: { 
-                        echoCancellation: true,
+                // iOS Safari often requires direct user interaction to start audio context
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume();
+                }
+                
+                console.log("Audio context state:", audioContext.state);
+                
+                // Different approach to microphone permissions based on browser
+                const constraints = { 
+                    audio: {
+                        // Less constraints for better compatibility
+                        echoCancellation: false,
                         noiseSuppression: false,
                         autoGainControl: false
-                    } 
-                });
+                    }
+                };
+                
+                console.log("Requesting microphone with constraints:", JSON.stringify(constraints));
+                
+                // Get microphone access
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                console.log("Got media stream:", stream.active ? "active" : "inactive");
+                
                 microphone = audioContext.createMediaStreamSource(stream);
+                console.log("Microphone source created successfully");
                 
                 // Create analyzer for input monitoring
                 analyzer = audioContext.createAnalyser();
@@ -345,7 +465,21 @@
                 
             } catch (error) {
                 console.error("Error accessing microphone:", error);
-                alert("Could not access microphone. Please ensure you've granted permission.");
+                // More detailed error message
+                const errorMessage = `Microphone access error: ${error.name}: ${error.message}
+                
+- Make sure microphone permissions are enabled in browser settings
+- Try using a different browser (Chrome often works best)
+- If using HTTPS, make sure your connection is secure
+- Refresh the page and try again
+                
+Technical details: ${error.toString()}`;
+                
+                console.error("Microphone access error:", error);
+                status.className = 'status inactive';
+                status.innerHTML = `Error: ${error.name}<br><small>${error.message}</small>`;
+                
+                alert(errorMessage);
             }
         }
         
