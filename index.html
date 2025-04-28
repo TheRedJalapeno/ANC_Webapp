@@ -125,8 +125,8 @@
             
             <div class="parameter">
                 <label for="gain">Output Gain</label>
-                <input type="range" id="gain" min="0" max="100" value="30" step="1">
-                <div class="value-display" id="gainValue">30%</div>
+                <input type="range" id="gain" min="0" max="100" value="75" step="1">
+                <div class="value-display" id="gainValue">75%</div>
             </div>
             
             <div class="parameter">
@@ -174,16 +174,19 @@
         </div>
     </div>
 
+    <!-- ----- ----- ----- -->
+    <!-- ----- ----- ----- -->
+    <!-- Footer Section -->
     <footer class="container" style="margin:1em auto;text-align:center;">
-        <p>&copy;
-            <script>document.write(new Date().getFullYear())</script> ZingLab. All rights reserved.
-        </p>
-        <!-- Contact Section -->
+        <p>&copy;<script>document.write(new Date().getFullYear())</script> ZingLab. All rights reserved.</p>
         <section id="contact" class="contact">
             <p><span>Hi</span>@<span>ZingLab.com</span></p>
         </section>
     </footer>
-
+    <!-- END of Footer Section -->
+    <!-- ----- ----- ----- -->
+    <!-- ----- ----- ----- -->
+    
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -312,7 +315,8 @@
                 const value = gainInput.value;
                 gainValue.textContent = `${value}%`;
                 if (gainNode) {
-                    gainNode.gain.value = value / 100;
+                    gainNode.gain.value = value / 100 * 3; // Multiply by 3 for more audible effect
+                    console.log("Gain updated to:", gainNode.gain.value);
                 }
             }
             
@@ -381,6 +385,13 @@
                     const stream = await navigator.mediaDevices.getUserMedia(constraints);
                     console.log("Got media stream:", stream.active ? "active" : "inactive");
                     
+                    // Display microphone tracks info for debugging
+                    stream.getAudioTracks().forEach(track => {
+                        console.log("Audio track:", track.label);
+                        console.log("Track settings:", JSON.stringify(track.getSettings()));
+                        console.log("Track constraints:", JSON.stringify(track.getConstraints()));
+                    });
+                    
                     microphone = audioContext.createMediaStreamSource(stream);
                     console.log("Microphone source created successfully");
                     
@@ -427,6 +438,32 @@
                     lowpassFilter.type = "lowpass";
                     lowpassFilter.frequency.value = highFreqInput.value; // Limit higher frequencies
 
+                    // Force audio output to be audible by adding a direct microphone connection
+                    // This bypasses the phase cancellation for testing purposes
+                    // microphone -> gain node (direct) -> output
+                    const directGain = audioContext.createGain();
+                    directGain.gain.value = 0.5; // Start with a moderate gain
+                    microphone.connect(directGain);
+                    directGain.connect(audioContext.destination);
+                    
+                    console.log("Direct microphone monitoring enabled for testing");
+                    
+                    // Add a button to control direct monitoring
+                    const monitorBtn = document.createElement('button');
+                    monitorBtn.textContent = 'Toggle Direct Monitoring';
+                    monitorBtn.style.background = '#9c27b0';
+                    monitorBtn.style.marginTop = '10px';
+                    stopBtn.parentNode.insertBefore(monitorBtn, stopBtn.nextSibling);
+                    monitorBtn.addEventListener('click', () => {
+                        if (directGain.gain.value > 0) {
+                            directGain.gain.value = 0;
+                            monitorBtn.textContent = 'Enable Direct Monitoring';
+                        } else {
+                            directGain.gain.value = 0.5;
+                            monitorBtn.textContent = 'Disable Direct Monitoring';
+                        }
+                    });
+                    
                     // Connect the nodes with filtering:
                     // microphone -> bandpass -> lowpass -> delay -> inverter -> gain -> outputAnalyzer -> output
                     microphone.connect(bandpassFilter);
